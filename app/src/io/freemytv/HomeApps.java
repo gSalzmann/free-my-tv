@@ -14,6 +14,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -60,6 +61,21 @@ final class HomeApps {
     static final int INPUTS = 7;
     /** The drawer's Restart button: restarts the TV through its own ADB (the home screen asks first). */
     static final int RESTART = 8;
+    /** An antenna channel in the Live TV sheet (CHANNELS): `number` is the one the TV shows, "4.1". */
+    static final int CHANNEL = 9;
+
+    /**
+     * The Live TV sheet: with any here, Live TV opens it instead of the TV's last channel. Logo (assets/logos/<key>.png,
+     * sources in CREDITS.txt), name, the channel's number as the TV shows it, and the brand color under the logo.
+     * Vila Velha (ES)'s digital channels. Edit freely; empty, Live TV opens the TV as before.
+     */
+    private static final String[][] CHANNELS = {
+        {"ch-globo", "Globo", "4.1", "FF6A1F"},
+        {"ch-record", "Record", "6.1", "8C9BC9"},
+        {"ch-band", "Band", "7.1", "B8B8B8"},
+        {"ch-sbt", "SBT", "10.1", "3A2EA8"},
+        {"ch-redetv", "RedeTV!", "18.1", "17A7E0"},
+    };
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -347,6 +363,24 @@ final class HomeApps {
         Item it = shortcut(DEVICE, key, label, symbol);
         it.intent = intent;
         items.add(it);
+    }
+
+    /** The Live TV sheet's channels, with their cards; none where the TV has no Live TV. */
+    static List<Item> channels(Context c) {
+        List<Item> items = new ArrayList<>();
+        if (CHANNELS.length == 0 || liveTv(c) == null) return items;
+        for (String[] ch : CHANNELS) {
+            Item it = shortcut(CHANNEL, ch[0], ch[1], "tv");
+            it.number = ch[2];
+            it.setTile(channelTile(c, ch[0], Color.parseColor("#" + ch[3])));
+            items.add(it);
+        }
+        return items;
+    }
+
+    /** Live TV as it opens without the sheet (a channel the TV doesn't list falls back to it). */
+    static Item liveTvItem() {
+        return shortcut(LIVE_TV, "live", Ui.tr("Live TV"), "tv");
     }
 
     /** A streaming service's app (the "Watch" button of the featured pick). */
@@ -1190,6 +1224,17 @@ final class HomeApps {
         Bitmap out = Ui.downscale(big, w, h);
         if (out != big) big.recycle();
         return out;
+    }
+
+    /** A channel's card: its logo as the apps' are; without the logo, the TV icon. */
+    private static synchronized Bitmap channelTile(Context c, String key, int brand) {
+        if (TILES.containsKey(key)) return TILES.get(key);
+        Bitmap logo = ownLogoCached(c, key);
+        if (logo == null) return symbolTile(c, key, "tv");
+        Bitmap tile = logoTile(logo, brand);
+        tile.setHasMipMap(true);
+        TILES.put(key, tile);
+        return tile;
     }
 
     /** Settings and the like: the icon in white on a dark card. */

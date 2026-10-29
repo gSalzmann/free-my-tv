@@ -34,6 +34,7 @@
  "Continue Watching": "Pokračovat ve sledování",
  "Continue Watching apps": "Aplikace pro Pokračovat ve sledování",
  "Couldn't check Free My TV: {error}": "Free My TV se nepodařilo zkontrolovat: {error}",
+ "Couldn't find channel {n}.": "Kanál {n} nebyl nalezen.",
  "Couldn't go back to the original: {error}": "Návrat k originálu se nepodařil: {error}",
  "Couldn't open TV Settings": "Nastavení TV se nepodařilo otevřít",
  "Couldn't open {app}.": "Nepodařilo se otevřít: {app}.",

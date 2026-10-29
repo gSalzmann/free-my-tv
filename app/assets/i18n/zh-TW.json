@@ -34,6 +34,7 @@
  "Continue Watching": "繼續觀看",
  "Continue Watching apps": "繼續觀看的應用程式",
  "Couldn't check Free My TV: {error}": "無法檢查 Free My TV：{error}",
+ "Couldn't find channel {n}.": "找不到頻道 {n}。",
  "Couldn't go back to the original: {error}": "無法還原原始設定：{error}",
  "Couldn't open TV Settings": "無法開啟電視設定",
  "Couldn't open {app}.": "無法開啟 {app}。",

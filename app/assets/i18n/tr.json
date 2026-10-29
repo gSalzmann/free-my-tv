@@ -34,6 +34,7 @@
  "Continue Watching": "İzlemeye Devam Et",
  "Continue Watching apps": "İzlemeye Devam Et uygulamaları",
  "Couldn't check Free My TV: {error}": "Free My TV denetlenemedi: {error}",
+ "Couldn't find channel {n}.": "{n} kanalı bulunamadı.",
  "Couldn't go back to the original: {error}": "Orijinale dönülemedi: {error}",
  "Couldn't open TV Settings": "TV Ayarları açılamadı",
  "Couldn't open {app}.": "{app} açılamadı.",

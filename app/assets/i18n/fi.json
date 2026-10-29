@@ -34,6 +34,7 @@
  "Continue Watching": "Jatka katsomista",
  "Continue Watching apps": "Jatka katsomista -sovellukset",
  "Couldn't check Free My TV: {error}": "Free My TV:n tarkistus epäonnistui: {error}",
+ "Couldn't find channel {n}.": "Kanavaa {n} ei löytynyt.",
  "Couldn't go back to the original: {error}": "Alkuperäiseen palaaminen epäonnistui: {error}",
  "Couldn't open TV Settings": "TV:n asetuksia ei voitu avata",
  "Couldn't open {app}.": "Ei voitu avata: {app}.",
