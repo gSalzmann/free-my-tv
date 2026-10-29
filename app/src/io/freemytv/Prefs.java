@@ -215,6 +215,10 @@ final class Prefs {
         version++;
     }
 
+    /** The drawer's TV card (CPU, memory, storage, temperature). */
+    static boolean tvCard() { return sp().getBoolean("tvCard", true); }
+    static void setTvCard(boolean on) { put("tvCard", on); }
+
     static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
     static void setQuotes(boolean on) { put("quotes", on); }
 

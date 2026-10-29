@@ -58,6 +58,8 @@ final class HomeApps {
     static final int APP = 0, LIVE_TV = 1, INPUT = 2, ALL_APPS = 3, SETTINGS = 4, ANDROID_SETTINGS = 5, DEVICE = 6;
     /** The "HDMI Inputs" button: opens the bottom drawer on the inputs (the home screen handles it). */
     static final int INPUTS = 7;
+    /** The drawer's Restart button: restarts the TV through its own ADB (the home screen asks first). */
+    static final int RESTART = 8;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -84,7 +86,7 @@ final class HomeApps {
     /**
      * Apps on the home shelf, in this order, when installed (the first FEW_APPS): key, name, package, brand color (for
      * its logo on glass) and how to lift the logo from the app's TV art: "tint" = a white logo takes the art's
-     * background color (Prime Video, Globoplay); "play" = the white triangle inside the red button stays white
+     * background color (Prime Video); "play" = the white triangle inside the red button stays white
      * (YouTube); "white" = only the white of the art, for a white logo over a busy gradient (Kinopoisk); empty = the
      * art's colors as they are. Last, a visual size tweak for the logo. Edit freely.
      */
@@ -108,7 +110,7 @@ final class HomeApps {
         {"now", "NOW", "com.bskyb.nowtv.beta", "1B9C8E", "", "1"},              // UK: Sky's NOW
         {"peacock", "Peacock", "com.peacocktv.peacockandroid", "6E55DC", "", "1"},
         {"peacock", "Peacock", "com.peacock.peacockfiretv", "6E55DC", "", "1"},
-        {"globoplay", "Globoplay", "com.globo.globotv", "FF5A1F", "tint", "1"},
+        {"plex", "Plex", "com.plexapp.android", "E5A00D", "", "1"},
         {"kinopoisk", "Кинопоиск", "ru.kinopoisk.tv", "FF5500", "white", "1"},
         {"okko", "Okko", "ru.more.play", "6D43FF", "", "1"},
         {"premier", "Premier", "gpm.tnt_premier", "FF2D55", "", "1"},
@@ -327,6 +329,8 @@ final class HomeApps {
                 c.getPackageManager().resolveActivity(tcorrection, 0) != null ? tcorrection : new Intent("action.htcsettings.prjsettings"));
         device(c, items, "mirroring", Ui.tr("Screen Mirroring"), "cast",
                 new Intent().setComponent(new ComponentName("com.softwinner.miracastReceiver", "com.softwinner.miracastReceiver.Miracast")));
+        // Last: the TV's ADB restarts it, so only in Free My TV mode, where its key is allowed.
+        if (Capabilities.adb(c)) items.add(shortcut(RESTART, "restart", Ui.tr("Restart"), "restart"));
         return items;
     }
 
