@@ -801,10 +801,13 @@ final class Recs {
                 && cache.getString(linkKey(p), null) == null && System.currentTimeMillis() >= linkRetryAt;
     }
 
-    /** A key is set and Watchmode hasn't refused it (a refused key isn't tried again until it changes). */
+    /**
+     * A key is set, Watchmode hasn't refused it (a refused key isn't tried again until it changes) and the picks are on
+     * the home screen: with Continue Watching or the clock there, nothing opens them, so no lookups spend the quota.
+     */
     private boolean linksOn() {
         String key = Config.WATCHMODE_KEY.trim();
-        return !key.isEmpty() && cache.getInt("wm:refused", 0) != key.hashCode();
+        return !key.isEmpty() && cache.getInt("wm:refused", 0) != key.hashCode() && Prefs.topContent().equals(Prefs.TOP_PICKS);
     }
 
     /** Sets p.link from what was looked up before, or looks it up (2 requests of the free plan's 2,500 a month). */
@@ -1052,7 +1055,9 @@ final class Recs {
             f.delete();
             return null;
         }
-        Bitmap card = Backdrop.card(full, Backdrop.TALL_W, Backdrop.TALL_H);
+        // A poster is 2:3 and the narrow card a little wider: the strip comes off the bottom (the credits' end), not
+        // half off the top, where the title often is.
+        Bitmap card = Backdrop.card(full, Backdrop.TALL_W, Backdrop.TALL_H, 0);
         if (card != full && !full.isRecycled()) full.recycle();   // the decoded 500 × 750 poster is 1.5 MB
         return new Poster(card);
     }
