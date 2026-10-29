@@ -81,6 +81,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final float CAPSULE_TOP = 46, CAPSULE_H = 68, BUTTON = 56;
     // Bottom drawer (measured with it open; everything moves up by SHIFT).
     private static final float SHIFT = 560, ROW_TITLE = 518, ROW_TOP = 540, ROW_H = 126, CARDS_TOP = 708, CARDS_H = 300;
+    /** The drawer's TV card, the quotes card beside it (what its longest price needs) and the weather's now/next split. */
+    private static final float TV_CARD_W = 380, QUOTES_NARROW_W = 520, WEATHER_SPLIT = 392;
     // "All Apps" sheet.
     private static final int COLUMNS = 5, VISIBLE_ROWS = 3;
     private static final float GRID_W = 300, GRID_H = 169, GRID_GAP = 40, GRID_ROW = 239, GRID_TOP = 196, GRID_RADIUS = 22;
@@ -107,6 +109,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Activity activity;
     private final Scene scene = new Scene();
     private final HomeData data;
+    private final SystemStats stats;
     private final Recs recs;
     private final NowPlaying.Watch playing;
     private final Click click;
@@ -140,7 +143,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     // At the top: tabs (0 to 2) and icon-only buttons (3 to 5); the three cards
     private int tab, topIndex, cardIndex;
-    private int widgetIndex;    // with TalkBack on, the drawer's weather (0) or quotes (1) card can take the focus
+    private int widgetIndex;    // with TalkBack on, the drawer's weather (0), quotes (1) or TV (2) card can take the focus
     private List<Recs.Pick> cards = new ArrayList<>();
     // The three tabs, then the round buttons at the top right (up to HomeApps.MAX_TOP).
     private final Spring[] topFocus = new Spring[3 + HomeApps.MAX_TOP];
@@ -217,7 +220,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private int drawerInputs;          // how many leading items are inputs (the rest are shortcuts)
     private Spring[] drawerFocus = new Spring[0];
     private RectF[] drawerRects = new RectF[0];
-    private final RectF weatherCard = new RectF(), quotesCard = new RectF();
+    private final RectF weatherCard = new RectF(), quotesCard = new RectF(), tvCard = new RectF();
+    /** The weather card's hours and days that fit its width (fewer when the TV card shares the row). */
+    private int weatherHours = 6, weatherDays = 5;
+    /** OK on Restart asks first: a second OK before this (uptimeMillis) restarts the TV. */
+    private long restartUntil;
     private final Spring drawer = new Spring(0.46f, 0.92f, 0);
     private boolean drawerOpen;
     private int drawerIndex;
@@ -256,7 +263,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private Paint labelPaint, metaPaint, clockPaint, buttonPaint, capsuleText, tipPaint, quotePaint, staleQuote;
     private Paint rowTitle, drawerLabel, cardTitle, cardText, cardDim, cardDimRight, bigTemp, hourPaint, hourTemp, dayLow;
-    private Paint pricePaint, changePaint, sheetTitle;
+    private Paint pricePaint, changePaint, sheetTitle, tvValue;
     private TextPaint titlePaint, gridLabel, toastPaint;
     private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Paint imagePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
@@ -291,6 +298,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private String weatherTitle, nowTemp, highLow, sunriseText, sunsetText, staleText;
     private final String[] hourText = new String[6], hourTempText = new String[6];
     private final String[] dayText = new String[5], dayMaxText = new String[5], dayMinText = new String[5];
+    // The TV card's rows (CPU, memory, storage, temperature): label, value and how full its bar is (NaN: unknown).
+    private SystemStats.Reading textStats;
+    private String tvTitle, tvUptime, tvLanguage;
+    private int tvPrefs = -1;
+    private final String[] tvName = new String[4], tvLabel = new String[4], tvText = new String[4];
+    private final float[] tvShare = new float[4];
+    private boolean sunTwoLines;
     private boolean textDays;   // the weather card shows the next days (Home Settings → Forecast) and has them
     private final String[] priceText = new String[HomeData.COINS.length], changeText = new String[HomeData.COINS.length];
 
@@ -362,6 +376,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             playing.start();   // the listener allowed after the screen showed (a no-op once watching)
             data.refreshIfStale();
             recs.refreshIfStale();
+            if (drawerOpen && Prefs.tvCard()) stats.refreshIfStale();   // the TV card: every 15 s while it shows
             checkNotices();
             updatePalette();
             checkNight(true);
@@ -375,6 +390,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         super(a);
         activity = a;
         data = HomeData.get(a);
+        stats = SystemStats.get(a);
         recs = Recs.get(a);
         playing = new NowPlaying.Watch(a, this::onPlaying);
         click = new Click(a);
@@ -445,6 +461,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         lastStep = 0;
         data.addListener(this);
         recs.addListener(this);
+        stats.setListener(this::onStats);
         data.refreshIfStale();
         recs.refreshIfStale();
         Photos.importInbox(getContext(), ownReady);   // photos a computer just sent
@@ -484,6 +501,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         playing.stop();
         data.removeListener(this);
         recs.removeListener(this);
+        stats.setListener(null);
+        restartUntil = 0;
         if (tvInputs != null) tvInputs.unregisterCallback(inputCallback);
     }
 
@@ -547,6 +566,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         layoutStatus();
         heroDirty = statusDirty = drawerDirty = true;
         platter.invalidate();
+    }
+
+    /** A new reading for the TV card: only the drawer is redrawn. */
+    private void onStats() {
+        if (!running) return;
+        wake();
+        drawerDirty = true;
     }
 
     @Override public void onRecs() {
@@ -677,6 +703,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         pricePaint.setTextAlign(Paint.Align.RIGHT);
         changePaint = Ui.numbers(Ui.semibold, 21 * k, 0xFFFFFFFF);
         changePaint.setTextAlign(Paint.Align.CENTER);
+        tvValue = Ui.numbers(Ui.medium, 23 * k, 0xF2FFFFFF);
+        tvValue.setTextAlign(Paint.Align.RIGHT);
         sheetTitle = Ui.text(Ui.displaySemibold, 40 * k, 0xFFFFFFFF);
         sheetTitle.setTextAlign(Paint.Align.CENTER);
         gridLabel = new TextPaint(Ui.text(Ui.medium, 24 * k, 0x99FFFFFF));
@@ -1664,13 +1692,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             snap(drawerRects[i]);
             x += tw + gap;
         }
-        float cardsTop = CARDS_TOP * k, split = left + (right - left) * 0.585f;
-        boolean wx = Prefs.weather(), qt = Prefs.quotes() && HomeData.active().length > 0;
-        // A card that is off gives its room to the other one.
-        weatherCard.set(left, cardsTop, qt ? split - 16 * k : right, cardsTop + CARDS_H * k);
-        quotesCard.set(wx ? split + 16 * k : left, cardsTop, right, cardsTop + CARDS_H * k);
-        snap(weatherCard);
-        snap(quotesCard);
+        layoutCards(left, right);
         // The symbols at their sizes at rest and focused: drawing them never scales one.
         for (HomeApps.Item it : drawerItems) {
             Symbols.warm(getContext(), it.symbol, 34 * k);
@@ -1683,11 +1705,43 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         drawerDirty = true;
     }
 
+    /**
+     * The drawer's cards, left to right: weather, TV, quotes. A card that is off gives its room to the others; with all
+     * three, the TV and quotes cards take what they need and the weather shows fewer hours or days.
+     */
+    private void layoutCards(float left, float right) {
+        float top = CARDS_TOP * k, bottom = top + CARDS_H * k, gap = 32 * k;
+        boolean wx = Prefs.weather(), tv = Prefs.tvCard(), qt = Prefs.quotes() && HomeData.active().length > 0;
+        float split = left + (right - left) * 0.585f;
+        float tvW = TV_CARD_W * k, quotesW = qt && wx && tv ? QUOTES_NARROW_W * k : 0;
+        float x = left;
+        if (wx) {
+            float end = !tv && !qt ? right : tv && qt ? right - tvW - quotesW - 2 * gap : !qt ? right - tvW - gap : split - gap / 2;
+            weatherCard.set(x, top, end, bottom);
+            x = end + gap;
+        }
+        if (tv) {
+            float end = !qt ? right : wx ? x + tvW : left + (right - left - gap) / 2;
+            tvCard.set(x, top, end, bottom);
+            x = end + gap;
+        }
+        quotesCard.set(qt ? x : left, top, right, bottom);
+        snap(weatherCard);
+        snap(tvCard);
+        snap(quotesCard);
+        // The hours (or days) right of the weather's split: as many as keep each column readable.
+        float columns = weatherCard.width() - (WEATHER_SPLIT + 60) * k;
+        weatherHours = Math.max(1, Math.min(6, (int) (columns / (80 * k))));
+        weatherDays = Math.max(1, Math.min(5, (int) (columns / (104 * k))));
+        textPrefs = tvPrefs = -1;   // the sunrise and sunset may need two lines now, the TV card's labels room
+    }
+
     private void openDrawer() {
         if (drawerItems.isEmpty()) return;
         drawerOpen = true;
         drawer.target = 1;
         zone = Z_DRAWER;
+        if (Prefs.tvCard()) stats.refreshIfStale();
         drawerIndex = shelf.isEmpty() ? 0 : nearest(drawerRects, tileRects[shelfIndex].centerX());
         for (int i = 0; i < drawerFocus.length; i++) drawerFocus[i].snap(i == drawerIndex ? 1 : 0);
         drawerDirty = true;
@@ -1743,6 +1797,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         for (int i = 0; i < drawerItems.size(); i++) if (i != top) drawDrawerTile(c, i);
         if (top >= 0) drawDrawerTile(c, top);
         if (Prefs.weather()) drawWeatherCard(c, weatherCard);
+        if (Prefs.tvCard()) drawTvCard(c, tvCard);
         if (Prefs.quotes() && HomeData.active().length > 0) drawQuotesCard(c, quotesCard);
     }
 
@@ -1802,14 +1857,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         c.drawText(nowTemp, x + sw + 18 * k - Ui.leftBearing(bigTemp, nowTemp), r.top + 170 * k, bigTemp);
         c.drawText(HomeData.condition(wx.code, wx.isDay), x, r.top + 220 * k, cardText);
         c.drawText(highLow, x, r.top + 258 * k, cardDim);
-        float split = r.left + 392 * k;
+        float split = r.left + WEATHER_SPLIT * k;
         fill.setShader(null);
         fill.setColor(tone(0x1A000000, 0x24FFFFFF));
         c.drawRoundRect(split - k, r.top + 34 * k, split + k, r.bottom - 34 * k, k, k, fill);
         float hx = split + 30 * k;
         if (textDays) {
-            float hw = (r.right - 30 * k - hx) / 5;
-            for (int i = 0; i < wx.days.size() && i < 5; i++) {
+            float hw = (r.right - 30 * k - hx) / weatherDays;
+            for (int i = 0; i < wx.days.size() && i < weatherDays; i++) {
                 float hc = hx + hw * (i + 0.5f);
                 c.drawText(dayText[i], hc, r.top + 96 * k, hourPaint);
                 Symbols.draw(getContext(), c, Symbols.weather(wx.dayCode.get(i), true), hc, r.top + 142 * k, 30 * k, drawerInk(0.9f));
@@ -1820,8 +1875,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 c.drawText(dayMinText[i], left + maxW + gap + minW / 2, r.top + 196 * k, dayLow);
             }
         } else {
-            float hw = (r.right - 30 * k - hx) / 6;
-            for (int i = 0; i < wx.hours.size() && i < 6; i++) {
+            float hw = (r.right - 30 * k - hx) / weatherHours;
+            for (int i = 0; i < wx.hours.size() && i < weatherHours; i++) {
                 float hc = hx + hw * (i + 0.5f);
                 c.drawText(hourText[i], hc, r.top + 96 * k, hourPaint);
                 Symbols.draw(getContext(), c, Symbols.weather(wx.hourCode.get(i), wx.hourDay.get(i)), hc, r.top + 142 * k, 30 * k, drawerInk(0.9f));
@@ -1829,8 +1884,18 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
         }
         float sx = hx, base = r.top + 258 * k;
+        if (sunTwoLines) {   // a narrow card (the TV card beside it): one under the other
+            if (wx.sunrise != 0) sunItem(c, "sunrise", sunriseText, hx, r.top + 240 * k);
+            if (wx.sunset != 0) sunItem(c, "sunset", sunsetText, hx, r.top + 274 * k);
+            return;
+        }
         if (wx.sunrise != 0) sx = sunItem(c, "sunrise", sunriseText, sx, base) + 36 * k;
         if (wx.sunset != 0) sunItem(c, "sunset", sunsetText, sx, base);
+    }
+
+    /** Width of a sunrise or sunset item: its symbol, the gap and the text. */
+    private float sunWidth(String symbol, String label) {
+        return Symbols.width(getContext(), symbol, 22 * k) + 10 * k + cardDim.measureText(label);
     }
 
     private void refreshDrawerText() {
@@ -1855,6 +1920,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
             sunriseText = Ui.trf("Sunrise {time}", "time", Ui.time(wx.sunrise));
             sunsetText = Ui.trf("Sunset {time}", "time", Ui.time(wx.sunset));
+            float room = weatherCard.right - 30 * k - (weatherCard.left + (WEATHER_SPLIT + 30) * k);
+            sunTwoLines = sunWidth("sunrise", sunriseText) + 36 * k + sunWidth("sunset", sunsetText) > room;
         }
         long minute = System.currentTimeMillis() / 60_000;
         if (data.pricesAt != textPricesAt || minute != textMinute || settings) {
@@ -1874,6 +1941,91 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         Symbols.draw(getContext(), c, symbol, x + sw / 2, base - Ui.halfCap(cardDim), size, tone(L_DIM, 0xB3FFFFFF));
         c.drawText(label, x + sw + 10 * k, base, cardDim);
         return x + sw + 10 * k + cardDim.measureText(label);
+    }
+
+    /** The TV itself: CPU, memory, storage and the chip's temperature, each with a thin bar; how long it has been on. */
+    private void drawTvCard(Canvas c, RectF r) {
+        drawerCard(c, r);
+        if (Ui.LEGACY) tvSnapshot.draw(c, r, stats.now().at + "|" + Prefs.version + "|" + Ui.language + "|"
+                + Float.floatToIntBits(dark()), cc -> drawTv(cc, r));
+        else drawTv(c, r);
+    }
+
+    private void drawTv(Canvas c, RectF r) {
+        refreshTvText();
+        float x = r.left + 34 * k, right = r.right - 34 * k;
+        c.drawText(tvTitle, x, r.top + 54 * k, cardTitle);
+        c.drawText(tvUptime, right, r.top + 54 * k, cardDimRight);
+        tvValue.setColor(drawerInk(0.95f));
+        for (int i = 0; i < tvLabel.length; i++) {
+            float base = r.top + (100 + 50 * i) * k, bar = base + 12 * k;
+            c.drawText(tvLabel[i], x, base, cardDim);
+            c.drawText(tvText[i], right, base, tvValue);
+            fill.setShader(null);
+            fill.setColor(tone(0x14000000, 0x1FFFFFFF));
+            c.drawRoundRect(x, bar, right, bar + 6 * k, 3 * k, 3 * k, fill);
+            float share = tvShare[i];
+            if (Float.isNaN(share)) continue;
+            // Calm until it runs high: amber from 75 %, red from 90 % (the temperature from 70 and 85 °C).
+            float warn = i == 3 ? 0.7f : 0.75f, alarm = i == 3 ? 0.85f : 0.9f;
+            fill.setColor(share >= alarm ? tone(0xFFD70015, DOWN_COLOR) : share >= warn ? tone(0xFFC93400, 0xFFFF9F0A) : drawerInk(0.8f));
+            c.drawRoundRect(x, bar, x + Math.max(6 * k, (right - x) * share), bar + 6 * k, 3 * k, 3 * k, fill);
+        }
+    }
+
+    /** The TV card's text, made again for a new reading, other settings or another language (never while drawing). */
+    private void refreshTvText() {
+        SystemStats.Reading s = stats.now();
+        boolean settings = Prefs.version != tvPrefs || !Ui.language.equals(tvLanguage);
+        if (s == textStats && !settings) return;
+        textStats = s;
+        tvPrefs = Prefs.version;
+        tvLanguage = Ui.language;
+        tvTitle = Ui.tr("card|TV");
+        long minutes = s.uptime / 60_000, days = minutes / (24 * 60);
+        tvUptime = s.uptime == 0 ? "" : Ui.trf("On for {time}", "time",
+                days > 0 ? Ui.plural("plural|one:{n} day|other:{n} days", days) : SleepTimer.duration((int) Math.max(1, minutes)));
+        tvName[0] = "CPU";
+        tvName[1] = Ui.tr("Memory");
+        tvName[2] = Ui.tr("Storage");
+        tvName[3] = Ui.tr("Temperature");
+        tvText[0] = Float.isNaN(s.cpu) ? "—" : java.text.NumberFormat.getPercentInstance(Ui.locale()).format(s.cpu);
+        tvShare[0] = s.cpu;
+        tvText[1] = gigabytes(s.memUsed, s.memTotal);
+        tvShare[1] = s.memTotal > 0 ? (float) s.memUsed / s.memTotal : Float.NaN;
+        tvText[2] = gigabytes(s.diskUsed, s.diskTotal);
+        tvShare[2] = s.diskTotal > 0 ? (float) s.diskUsed / s.diskTotal : Float.NaN;
+        tvText[3] = HomeData.degrees(s.temp);
+        tvShare[3] = Float.isNaN(s.temp) ? Float.NaN : Ui.clamp(s.temp / 100);
+        // A long label (another language) gives way to its value.
+        for (int i = 0; i < tvLabel.length; i++) {
+            fitPaint.set(cardDim);
+            float room = tvCard.width() - 68 * k - tvValue.measureText(tvText[i]) - 14 * k;
+            tvLabel[i] = TextUtils.ellipsize(tvName[i], fitPaint, Math.max(room, 40 * k), TextUtils.TruncateAt.END).toString();
+        }
+    }
+
+    /** "1.4 / 2 GB": one decimal under 10 GB, none above. */
+    private static String gigabytes(long used, long total) {
+        if (total <= 0) return "—";
+        return Ui.trf("{used} / {total} GB", "used", oneDecimal(used / 1e9), "total", oneDecimal(total / 1e9));
+    }
+
+    private static String oneDecimal(double v) {
+        java.text.NumberFormat f = java.text.NumberFormat.getNumberInstance(Ui.locale());
+        f.setMaximumFractionDigits(v < 10 ? 1 : 0);
+        f.setMinimumFractionDigits(0);
+        return f.format(v);
+    }
+
+    /** The TV card as TalkBack reads it. */
+    private String tvText() {
+        refreshTvText();
+        StringBuilder s = new StringBuilder(tvTitle);
+        if (!tvUptime.isEmpty()) s.append(", ").append(tvUptime);
+        s.append('.');
+        for (int i = 0; i < tvName.length; i++) s.append(' ').append(tvName[i]).append(' ').append(tvText[i]).append('.');
+        return s.toString();
     }
 
     /** Prices in the configured currency with the 24 h change (green/red, like Apple's Stocks app). */
@@ -1918,7 +2070,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
     }
 
-    private final Snapshot weatherSnapshot = new Snapshot(), quotesSnapshot = new Snapshot();
+    private final Snapshot weatherSnapshot = new Snapshot(), quotesSnapshot = new Snapshot(), tvSnapshot = new Snapshot();
 
     private void drawPrices(Canvas c, RectF r) {
         float x = r.left + 34 * k, right = r.right - 34 * k;
@@ -2491,6 +2643,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             openSheet();
             return;
         }
+        if (it.kind == HomeApps.RESTART) {
+            restart();
+            return;
+        }
         if (it.kind == HomeApps.INPUTS) {
             openDrawer();
             for (int i = 0; i < drawerItems.size(); i++) {
@@ -2505,6 +2661,24 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         boolean opened = HomeApps.open(activity, it, this, Math.round(r.left), Math.round(r.top),
                 Math.round(r.width()), Math.round(r.height()));
         if (!opened) showToast(Ui.trf("Couldn't open {app}.", "app", it.label));
+    }
+
+    /** The drawer's Restart: the first OK asks, a second one within the toast's time restarts the TV. */
+    private void restart() {
+        long now = SystemClock.uptimeMillis();
+        if (now > restartUntil) {
+            restartUntil = now + TOAST_MS;
+            showToast(Ui.tr("Press OK again to restart the TV."));
+            return;
+        }
+        restartUntil = 0;
+        toasts.clear();   // "Press OK again" goes at once
+        toast = null;
+        toastLayer.invalidate();
+        showToast(Ui.tr("Restarting the TV…"));
+        SystemStats.restart(getContext(), ok -> {
+            if (!ok) showToast(Ui.tr("Couldn't restart the TV."));
+        });
     }
 
     // MARK: - Holding OK: All Apps puts the app on the shelf or takes it off; on the shelf, the app is lifted to move
@@ -2763,6 +2937,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         for (int i = shelfFirst; i < Math.min(shelf.size(), shelfFirst + shelfVisible); i++) out.add(a11yId(Z_SHELF, i));
         for (int i = 0; i < drawerItems.size(); i++) out.add(a11yId(Z_DRAWER, i));
         if (drawerOpen && Prefs.weather()) out.add(a11yId(WIDGETS, 0));
+        if (drawerOpen && Prefs.tvCard()) out.add(a11yId(WIDGETS, 2));
         if (drawerOpen && Prefs.quotes() && HomeData.active().length > 0) out.add(a11yId(WIDGETS, 1));
     }
 
@@ -2783,7 +2958,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 }
                 return label(shelf, i);
             case Z_DRAWER: return label(drawerItems, i);
-            case WIDGETS: return i == 0 ? weatherText() : quotesText();
+            case WIDGETS: return i == 0 ? weatherText() : i == 2 ? tvText() : quotesText();
             default: return "";
         }
     }
@@ -2827,7 +3002,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 break;
             case WIDGETS:
                 if (!drawerOpen) return false;
-                a11yRect.set(i == 0 ? weatherCard : quotesCard);
+                a11yRect.set(i == 0 ? weatherCard : i == 2 ? tvCard : quotesCard);
                 dy = 0;
                 break;
             default:
@@ -2853,11 +3028,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
     }
 
-    /** The drawer's widgets that are on (0 weather, 1 quotes), with the drawer open. */
+    /** The drawer's widgets that are on, left to right (0 weather, 2 TV, 1 quotes), with the drawer open. */
     private List<Integer> widgets() {
         List<Integer> out = new ArrayList<>();
         if (!drawerOpen) return out;
         if (Prefs.weather()) out.add(0);
+        if (Prefs.tvCard()) out.add(2);
         if (Prefs.quotes() && HomeData.active().length > 0) out.add(1);
         return out;
     }

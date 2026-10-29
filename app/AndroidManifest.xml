@@ -49,6 +49,7 @@
         <package android:name="com.peacocktv.peacockandroid" />
         <package android:name="com.peacock.peacockfiretv" />
         <package android:name="com.globo.globotv" />
+        <package android:name="com.plexapp.android" />
         <package android:name="ru.kinopoisk.tv" />
         <package android:name="ru.more.play" />
         <package android:name="gpm.tnt_premier" />

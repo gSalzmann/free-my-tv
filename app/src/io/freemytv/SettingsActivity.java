@@ -775,9 +775,9 @@ public class SettingsActivity extends Activity {
 
         private static final String[] UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         /** Home Settings: language, temperature, theme, my photos, sounds, picks, watch from the screensaver, weather, city,
-         *  forecast, now playing, quotes, one row per coin, then the TMDB key and updates (the last row). */
+         *  forecast, now playing, the TV card, quotes, one row per coin, then the TMDB key and updates (the last row). */
         private static final int PHOTOS_ROW = 3, PICKS_ROW = 5, SAVER_ROW = 6, WEATHER_ROW = 7, CITY_ROW = 8, FORECAST_ROW = 9,
-                PLAYING_ROW = 10, QUOTES_ROW = 11, COIN_ROWS = 12;
+                PLAYING_ROW = 10, TV_ROW = 11, QUOTES_ROW = 12, COIN_ROWS = 13;
         /** Home Settings rows on screen at once (what fits above the hints at 1080p); a longer list scrolls. */
         private static final int SETTINGS_VISIBLE = 10;
 
@@ -798,6 +798,7 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("City"));
             l.add(Ui.tr("Forecast"));
             l.add(Ui.tr("Now Playing widget"));
+            l.add(Ui.tr("TV widget"));
             l.add(Ui.tr("Quotes widget"));
             l.add("Bitcoin");
             l.add("Ethereum");
@@ -850,6 +851,7 @@ public class SettingsActivity extends Activity {
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
             v[FORECAST_ROW] = Prefs.forecast().equals("days") ? Ui.tr("Next days") : Ui.tr("Next hours");
             v[PLAYING_ROW] = onOff(Prefs.nowPlaying());
+            v[TV_ROW] = onOff(Prefs.tvCard());
             v[QUOTES_ROW] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
             for (int i = COIN_ROWS; i < v.length - 2; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
@@ -1143,6 +1145,7 @@ public class SettingsActivity extends Activity {
                     Prefs.setNowPlaying(!Prefs.nowPlaying());
                     HomeMode.nowPlayingAccess(getContext());
                     break;
+                case TV_ROW: Prefs.setTvCard(!Prefs.tvCard()); break;
                 case QUOTES_ROW: Prefs.setQuotes(!Prefs.quotes()); break;
                 default:
                     if (row >= keyRow() || !Prefs.quotes()) return;   // the key and Updates act on OK only
