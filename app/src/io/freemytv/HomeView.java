@@ -280,6 +280,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     // "All Apps" sheet
     private List<HomeApps.Item> others = new ArrayList<>();
+    // The same sheet lists the antenna's channels when Live TV opens it (channelSheet stays set while it fades out).
+    private List<HomeApps.Item> channels = new ArrayList<>();
+    private boolean channelSheet;
     private Spring[] gridFocus = new Spring[0];
     private String[] gridLabels;
     private final Spring sheet = new Spring(0.38f, 0.9f, 0);
@@ -2306,12 +2309,30 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private void setOthers(List<HomeApps.Item> list) {
         others = list;
-        gridFocus = new Spring[list.size()];
+        gridFocus = new Spring[Math.max(list.size(), channels.size())];   // one spring per card of either list
         for (int i = 0; i < gridFocus.length; i++) gridFocus[i] = new Spring(0.3f, 0.82f, 0);
         gridLabels = null;
-        gridIndex = Math.min(gridIndex, Math.max(0, list.size() - 1));
+        gridIndex = Math.min(gridIndex, Math.max(0, grid().size() - 1));
         retargetGrid(true);
         gridDirty = true;
+    }
+
+    /** What the sheet shows: All Apps, or the channels. */
+    private List<HomeApps.Item> grid() {
+        return channelSheet ? channels : others;
+    }
+
+    private void setChannels(List<HomeApps.Item> list) {
+        channels = list;
+        if (gridFocus.length < list.size()) setOthers(others);
+    }
+
+    /** Live TV with channels set up: the sheet lists them, and OK on one tunes it. */
+    private void openChannels() {
+        openSheet();
+        channelSheet = true;
+        gridLabels = null;
+        retargetGrid(true);
     }
 
     /** All Apps from the remote's button. Coming back from another app, resume() opens it (it closes the sheet). */
@@ -2328,6 +2349,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private void openSheet() {
         sheetOpen = true;
+        if (channelSheet) gridLabels = null;
+        channelSheet = false;
         gridIndex = 0;
         scroll.snap(0);
         retargetGrid(true);
@@ -2351,7 +2374,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             gridFocus[i].target = sheetOpen && i == gridIndex ? 1 : 0;
             if (snap) gridFocus[i].snap(gridFocus[i].target);
         }
-        int rows = Math.max(1, (others.size() + COLUMNS - 1) / COLUMNS);
+        int rows = Math.max(1, (grid().size() + COLUMNS - 1) / COLUMNS);
         int visible = Math.min(rows, VISIBLE_ROWS);
         int r = gridIndex / COLUMNS;
         float target = scroll.target;
@@ -2365,12 +2388,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void drawSheet(Canvas c) {
         c.drawColor(0xA8000000);
         float shift = scroll.value * GRID_ROW * k;
-        c.drawText(Ui.tr("All Apps"), w / 2f, 124 * k - shift, sheetTitle);
-        int n = others.size();
+        c.drawText(channelSheet ? Ui.tr("Live TV") : Ui.tr("All Apps"), w / 2f, 124 * k - shift, sheetTitle);
+        int n = grid().size();
         if (gridLabels == null || gridLabels.length != n) {
             gridLabels = new String[n];
             for (int i = 0; i < n; i++) {
-                gridLabels[i] = TextUtils.ellipsize(others.get(i).label, gridLabel, (GRID_W - 10) * k, TextUtils.TruncateAt.END).toString();
+                gridLabels[i] = TextUtils.ellipsize(grid().get(i).label, gridLabel, (GRID_W - 10) * k, TextUtils.TruncateAt.END).toString();
             }
         }
         float gridWidth = COLUMNS * GRID_W + (COLUMNS - 1) * GRID_GAP;
@@ -2383,7 +2406,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             float x = left + col * (GRID_W + GRID_GAP) * k;
             gridCell.set(x, y, x + GRID_W * k, y + GRID_H * k);
             float f = gridFocus[i].value;
-            drawCard(c, others.get(i), gridCell, GRID_RADIUS * k, f, 0.08f);
+            drawCard(c, grid().get(i), gridCell, GRID_RADIUS * k, f, 0.08f);
             if (sheetOpen && i == gridIndex) focusedCell.set(cell);
             gridLabel.setColor(blend(0x99FFFFFF, 0xFFFFFFFF, Ui.clamp(f)));
             c.drawText(gridLabels[i], gridCell.centerX(), gridCell.bottom + (40 + 6 * f) * k, gridLabel);
@@ -2534,6 +2557,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             final List<HomeApps.Item> st = statusList(c);
             final List<HomeApps.Item> d = drawerList(c);
             final List<HomeApps.Item> o = apps ? HomeApps.others(c) : null;
+            final List<HomeApps.Item> ch = apps ? HomeApps.channels(c) : null;
             final List<HomeApps.Item> top = apps ? HomeApps.topButtons() : null;   // they change with Prefs too
             // Only read when it's shown: with the picks or the clock, Continue Watching costs nothing.
             final String mode = Prefs.topContent();
@@ -2545,6 +2569,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 if (s != null) setShelf(s);
                 setStatusItems(st);
                 setDrawerItems(d);
+                if (ch != null && !sheetOpen) setChannels(ch);
                 if (o != null && !sheetOpen) setOthers(o);
                 else if (o != null) appsStale = true;   // All Apps is open: its list comes next time
             });
@@ -2751,7 +2776,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     private void moveGrid(int dx, int dy) {
-        int n = others.size();
+        int n = grid().size();
         if (n == 0) return;
         int r = gridIndex / COLUMNS, col = gridIndex % COLUMNS;
         int rows = (n + COLUMNS - 1) / COLUMNS;
@@ -2784,8 +2809,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         RectF r;
         if (!sheetOpen && zone == WIDGETS) return;   // a widget is only read
         if (sheetOpen) {
-            if (others.isEmpty()) return;
-            it = others.get(gridIndex);
+            if (grid().isEmpty()) return;
+            it = grid().get(gridIndex);
             r = focusedCell;
         } else if (zone == Z_HERO) {
             Recs.Pick p = currentPick();
@@ -2831,6 +2856,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             restart();
             return;
         }
+        if (it.kind == HomeApps.LIVE_TV && !channels.isEmpty()) {
+            openChannels();
+            return;
+        }
+        if (it.kind == HomeApps.CHANNEL) {
+            tune(it, r);
+            return;
+        }
         if (it.kind == HomeApps.INPUTS) {
             openDrawer();
             for (int i = 0; i < drawerItems.size(); i++) {
@@ -2845,6 +2878,28 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         boolean opened = HomeApps.open(activity, it, this, Math.round(r.left), Math.round(r.top),
                 Math.round(r.width()), Math.round(r.height()));
         if (!opened) showToast(Ui.trf("Couldn't open {app}.", "app", it.label));
+    }
+
+    /**
+     * A channel from the Live TV sheet: TvChannels looks it up off the UI thread; one it can't find still opens Live
+     * TV, on its last channel.
+     */
+    private void tune(HomeApps.Item it, RectF r) {
+        final int x = Math.round(r.left), y = Math.round(r.top), cw = Math.round(r.width()), ch = Math.round(r.height());
+        TvChannels.find(getContext(), it.number, intent -> {
+            if (!running) return;   // the TV went elsewhere meanwhile
+            if (intent != null) {
+                try {
+                    activity.startActivity(intent, android.app.ActivityOptions.makeScaleUpAnimation(this, x, y,
+                            Math.max(cw, 1), Math.max(ch, 1)).toBundle());
+                    return;
+                } catch (android.content.ActivityNotFoundException | SecurityException e) {
+                    AppLog.w("channel " + it.number + ": " + e.getMessage());
+                }
+            }
+            showToast(Ui.trf("Couldn't find channel {n}.", "n", it.number));
+            HomeApps.open(activity, HomeApps.liveTvItem(), this, x, y, cw, ch);
+        });
     }
 
     /** The drawer's Restart: the first OK asks, a second one within the toast's time restarts the TV. */
@@ -2889,8 +2944,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     private boolean canToggleShelf(int i) {
-        if (!sheetOpen || i >= others.size()) return false;
-        HomeApps.Item it = others.get(i);
+        if (!sheetOpen || i >= grid().size()) return false;
+        HomeApps.Item it = grid().get(i);
         return it.kind == HomeApps.APP && it.pkg != null;
     }
 
@@ -2901,7 +2956,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (!canToggleShelf(gridIndex)) return;
         okHeld = true;
         toggledAt = SystemClock.uptimeMillis();
-        final HomeApps.Item it = others.get(gridIndex);
+        final HomeApps.Item it = grid().get(gridIndex);
         final Context c = getContext().getApplicationContext();
         click.open();
         LOADER.execute(() -> {
@@ -3127,7 +3182,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             return;
         }
         if (sheetOpen) {
-            for (int i = 0; i < others.size(); i++) out.add(a11yId(GRID, i));
+            for (int i = 0; i < grid().size(); i++) out.add(a11yId(GRID, i));
             return;
         }
         for (int i = picksMode() ? 0 : 3; i < 3 + lightButtons.size(); i++) out.add(a11yId(Z_TOP, i));
@@ -3148,8 +3203,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 return (i == 0 && menuItem != null ? menuItem.title + ". " : "") + menuOptions[i] + ", "
                         + Ui.trf("{i} of {n}", "i", i + 1, "n", menuOptions.length);
             case GRID:
-                if (i >= others.size()) return "";
-                return label(others, i) + ", " + Ui.trf("{i} of {n}", "i", i + 1, "n", others.size());
+                if (i >= grid().size()) return "";
+                return label(grid(), i) + ", " + Ui.trf("{i} of {n}", "i", i + 1, "n", grid().size());
             case Z_TOP:
                 if (i >= 3) return label(lightButtons, i - 3);
                 return Ui.trf("{name}, tab {i} of {n}", "name", tabs()[i], "i", i + 1, "n", 3);
@@ -3186,7 +3241,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 dy = 0;
                 break;
             case GRID: {
-                if (!sheetOpen || i >= others.size()) return false;
+                if (!sheetOpen || i >= grid().size()) return false;
                 float gridWidth = COLUMNS * GRID_W + (COLUMNS - 1) * GRID_GAP;
                 float x = ((1920 - gridWidth) / 2 + (i % COLUMNS) * (GRID_W + GRID_GAP)) * k;
                 float y = (GRID_TOP + (i / COLUMNS - scroll.target) * GRID_ROW) * k;
@@ -3248,7 +3303,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private int a11yFocused() {
         if (menuOpen) return a11yId(MENU_ITEMS, menuIndex);
-        if (sheetOpen) return others.isEmpty() ? -1 : a11yId(GRID, gridIndex);
+        if (sheetOpen) return grid().isEmpty() ? -1 : a11yId(GRID, gridIndex);
         switch (zone) {
             case Z_TOP: return a11yId(Z_TOP, topIndex);
             case Z_CARDS: return cardIndex < cards.size() ? a11yId(Z_CARDS, cardIndex) : -1;
@@ -3301,7 +3356,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             return;
         }
         if (group == GRID) {
-            if (!sheetOpen || i >= others.size()) return;
+            if (!sheetOpen || i >= grid().size()) return;
             gridIndex = i;
             retargetGrid(false);
             gridDirty = true;

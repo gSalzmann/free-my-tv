@@ -34,6 +34,7 @@
  "Continue Watching": "Continue Watching",
  "Continue Watching apps": "Continue Watching apps",
  "Couldn't check Free My TV: {error}": "Couldn't check Free My TV: {error}",
+ "Couldn't find channel {n}.": "Couldn't find channel {n}.",
  "Couldn't go back to the original: {error}": "Couldn't go back to the original: {error}",
  "Couldn't open TV Settings": "Couldn't open TV Settings",
  "Couldn't open {app}.": "Couldn't open {app}.",

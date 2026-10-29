@@ -34,6 +34,7 @@
  "Continue Watching": "Seguir viendo",
  "Continue Watching apps": "Apps de Seguir viendo",
  "Couldn't check Free My TV: {error}": "No se pudo comprobar Free My TV: {error}",
+ "Couldn't find channel {n}.": "No se encontró el canal {n}.",
  "Couldn't go back to the original: {error}": "No se pudo volver al modo original: {error}",
  "Couldn't open TV Settings": "No se pudieron abrir los Ajustes del TV",
  "Couldn't open {app}.": "No se pudo abrir {app}.",

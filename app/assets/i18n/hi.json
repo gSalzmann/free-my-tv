@@ -34,6 +34,7 @@
  "Continue Watching": "देखना जारी रखें",
  "Continue Watching apps": "देखना जारी रखें के ऐप",
  "Couldn't check Free My TV: {error}": "Free My TV की जाँच नहीं हो सकी: {error}",
+ "Couldn't find channel {n}.": "चैनल {n} नहीं मिला।",
  "Couldn't go back to the original: {error}": "मूल पर वापस नहीं जा सके: {error}",
  "Couldn't open TV Settings": "TV सेटिंग नहीं खुल सकी",
  "Couldn't open {app}.": "{app} नहीं खुल सका।",

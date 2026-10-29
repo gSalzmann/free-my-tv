@@ -34,6 +34,7 @@
  "Continue Watching": "Продовжити перегляд",
  "Continue Watching apps": "Додатки для «Продовжити перегляд»",
  "Couldn't check Free My TV: {error}": "Не вдалося перевірити Free My TV: {error}",
+ "Couldn't find channel {n}.": "Канал {n} не знайдено.",
  "Couldn't go back to the original: {error}": "Не вдалося повернутися до початкового: {error}",
  "Couldn't open TV Settings": "Не вдалося відкрити налаштування ТВ",
  "Couldn't open {app}.": "Не вдалося відкрити {app}.",

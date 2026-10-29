@@ -34,6 +34,7 @@
  "Continue Watching": "Fortsätt titta",
  "Continue Watching apps": "Appar för Fortsätt titta",
  "Couldn't check Free My TV: {error}": "Kunde inte kontrollera Free My TV: {error}",
+ "Couldn't find channel {n}.": "Kanal {n} hittades inte.",
  "Couldn't go back to the original: {error}": "Kunde inte gå tillbaka till originalet: {error}",
  "Couldn't open TV Settings": "Kunde inte öppna tv-inställningarna",
  "Couldn't open {app}.": "Kunde inte öppna {app}.",

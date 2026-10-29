@@ -34,6 +34,7 @@
  "Continue Watching": "Continuă vizionarea",
  "Continue Watching apps": "Aplicații pentru Continuă vizionarea",
  "Couldn't check Free My TV: {error}": "Nu am putut verifica Free My TV: {error}",
+ "Couldn't find channel {n}.": "Canalul {n} nu a fost găsit.",
  "Couldn't go back to the original: {error}": "Nu am putut reveni la original: {error}",
  "Couldn't open TV Settings": "Nu am putut deschide setările TV",
  "Couldn't open {app}.": "Nu am putut deschide {app}.",

@@ -1,0 +1,16 @@
+Channel logos for the Live TV sheet, from Wikimedia Commons: made white (the symbol only, the wordmark left out
+where the logo has one apart from it, except RedeTV!, whose name is its symbol), trimmed and scaled down to 512 px.
+The logos are trademarks of their owners.
+
+ch-globo.png   TV Globo Logo 2025.png, by Rede tnb, CC BY-SA 4.0
+               https://commons.wikimedia.org/wiki/File:TV_Globo_Logo_2025.png
+ch-record.png  Logomarca da Record (2023).webp, by Grupo Record, public domain
+               https://commons.wikimedia.org/wiki/File:Logomarca_da_Record_(2023).webp
+ch-band.png    Rede Bandeirantes logo 2018.svg, by Rede Bandeirantes, public domain
+               https://commons.wikimedia.org/wiki/File:Rede_Bandeirantes_logo_2018.svg
+ch-sbt.png     SBT-Logotipo-2021.png, by Sistema Brasileiro de Televisão, CC BY-SA 4.0
+               https://commons.wikimedia.org/wiki/File:SBT-Logotipo-2021.png
+ch-redetv.png  RedeTV! 2019 logo.png, public domain
+               https://commons.wikimedia.org/wiki/File:RedeTV!_2019_logo.png
+
+CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/
