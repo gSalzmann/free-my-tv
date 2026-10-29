@@ -11,8 +11,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Settings changed on the TV itself (Free My TV > Settings). config.properties only gives the first
@@ -59,6 +61,7 @@ final class Prefs {
                     KEY_SONY_PLAY}
             : RemoteKeys.STEM_NETFLIX ? new int[] {KEY_STEM_NETFLIX}
             : RemoteKeys.KTC ? new int[] {KEY_KTC_TABII}
+            : RemoteKeys.XIAOMI_PATCHWALL_ONLY ? new int[] {KEY_XIAOMI_PATCHWALL}
             : RemoteKeys.XIAOMI ? new int[] {KEY_MI, KEY_YOUTUBE, KEY_XIAOMI_PATCHWALL, KEY_XIAOMI_OKKO, KEY_XIAOMI_VK,
                     KEY_XIAOMI_RUTUBE, KEY_XIAOMI_KION, KEY_XIAOMI_WINK, KEY_XIAOMI_IVI}
             : new int[] {KEY_NETFLIX, KEY_YOUTUBE, KEY_PRIME, KEY_TCL_CHANNEL};
@@ -78,6 +81,14 @@ final class Prefs {
     static boolean clock24() {
         return app != null && android.text.format.DateFormat.is24HourFormat(app);
     }
+
+    /** "auto" (the TV's own 12/24-hour setting), "24" or "12". */
+    static String clockFormat() {
+        String v = sp().getString("clock", "auto");
+        return v.equals("24") || v.equals("12") ? v : "auto";
+    }
+
+    static void setClockFormat(String v) { put("clock", v); }
 
     /** The app's context in this process (null before App.onCreate). */
     static Context context() {
@@ -113,6 +124,14 @@ final class Prefs {
     private static void put(String key, boolean value) {
         sp().edit().putBoolean(key, value).apply();
         version++;
+    }
+
+    /**
+     * Without bumping `version`: a new version makes the home screen start over (and fetch the weather and prices
+     * again). Continue Watching's lists don't need that: the home screen reads them on every return (reload).
+     */
+    private static void putQuietly(String key, Set<String> value) {
+        sp().edit().putStringSet(key, new HashSet<>(value)).apply();
     }
 
     // MARK: - Language and units
@@ -201,6 +220,27 @@ final class Prefs {
     static boolean saverWatch() { return sp().getBoolean("saverWatch", false); }
     static void setSaverWatch(boolean on) { put("saverWatch", on); }
 
+    // MARK: - Top of the home screen
+
+    static final String TOP_PICKS = "picks", TOP_CONTINUE = "continue", TOP_NONE = "none";
+    static final String[] TOP_CONTENT = {TOP_PICKS, TOP_CONTINUE, TOP_NONE};
+
+    /** What the cards under the title show: the recommendations (TMDB), what you were watching in your apps, or nothing. */
+    static String topContent() {
+        String v = sp().getString("topContent", TOP_PICKS);
+        return v.equals(TOP_CONTINUE) || v.equals(TOP_NONE) ? v : TOP_PICKS;
+    }
+
+    static void setTopContent(String v) { put("topContent", v); }
+
+    /** Apps left out of Continue Watching (Settings), by package. */
+    static Set<String> watchOff() { return new HashSet<>(sp().getStringSet("watchOff", new HashSet<>())); }
+    static void setWatchOff(Set<String> packages) { putQuietly("watchOff", packages); }
+
+    /** Single items hidden from Continue Watching (holding OK on a card), as WatchNext.hideKey. */
+    static Set<String> watchHidden() { return new HashSet<>(sp().getStringSet("watchHidden", new HashSet<>())); }
+    static void setWatchHidden(Set<String> keys) { putQuietly("watchHidden", keys); }
+
     // MARK: - Widgets and coins
 
     static boolean weather() { return sp().getBoolean("weather", true); }
@@ -228,6 +268,13 @@ final class Prefs {
 
     static boolean coin(int i) { return sp().getBoolean("coin" + i, true); }
     static void setCoin(int i, boolean on) { put("coin" + i, on); }
+
+    /**
+     * Also list the TV's own system apps (Settings, Files, the manufacturer's apps) in All Apps and the shelf editor.
+     * Off keeps the list as it always was: the apps people installed, plus the system ones a TV needs there.
+     */
+    static boolean androidApps() { return sp().getBoolean("androidapps", false); }
+    static void setAndroidApps(boolean on) { put("androidapps", on); }
 
     // MARK: - TMDB key
 
